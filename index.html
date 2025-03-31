@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Smart Photo Frame</title>
+  <style>
+    body { margin: 0; background: black; }
+    img {
+      width: 100vw;
+      height: 100vh;
+      object-fit: contain;
+      transition: opacity 1s;
+      opacity: 0;
+    }
+    img.active {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <img id="slideshow" src="" />
+  <script>
+    const endpoint = "https://script.googleusercontent.com/macros/echo?user_content_key=AehSKLiSf6xMtx_Pzx7z_T-dFDOXmTUWHMh_hyAjiQ85us-GQAJbNX5FZBaeMD6eP9Zrfx5kgAskakS0BcNRMbTB-qR3TyO-XABSMsiS-5gqXF1DIJeyoB_D12NHvlCasMxM5HB0ogpnYen4IpWeI9GDcvSCkqO50QWG4h5uN2ws4lb1VzRxlWSdwp_qoPJDU6ABlodyOmykPvWlXlCv8w0sL1c1S-xOh_-hZy62ZZznSCy5eR5jUB07YYUo-oU8scGJ4Fw491cWEoC4O_zbwCDhOTmBvlKvxw&lib=MOmAem6NOzRRB8q5sUtW1UfTldaWMT9HL"; // 👈 Put your deployment URL here
+    let images = [], current = 0;
+
+    async function fetchImages() {
+      try {
+        const res = await fetch(endpoint);
+        images = await res.json();
+        if (images.length > 0) {
+          showNext();
+          setInterval(showNext, 5000); // Change every 5 seconds
+        } else {
+          document.body.innerHTML = "<h2 style='color:white;text-align:center;'>No images found</h2>";
+        }
+      } catch (err) {
+        console.error("Error fetching images:", err);
+        document.body.innerHTML = "<h2 style='color:white;text-align:center;'>Failed to load images</h2>";
+      }
+    }
+
+    function showNext() {
+      const img = document.getElementById("slideshow");
+      img.classList.remove("active");
+      setTimeout(() => {
+        img.src = images[current].url;
+        img.onload = () => img.classList.add("active");
+        current = (current + 1) % images.length;
+      }, 500); // Small delay for fade-out effect
+    }
+
+    fetchImages();
+  </script>
+</body>
+</html>
