@@ -4,52 +4,125 @@
   <meta charset="UTF-8">
   <title>Smart Photo Frame</title>
   <style>
-    body { margin: 0; background: black; }
+    body {
+      margin: 0;
+      background: black;
+      overflow: hidden;
+    }
+
     img {
       width: 100vw;
       height: 100vh;
       object-fit: contain;
-      transition: opacity 1s;
-      opacity: 0;
+      transition: opacity 0.5s ease;
     }
-    img.active {
-      opacity: 1;
+
+    img.hidden {
+      opacity: 0;
     }
   </style>
 </head>
 <body>
-  <img id="slideshow" src="" />
+  <img id="slideshow" src="" class="hidden" />
   <script>
-    const endpoint = "https://script.google.com/macros/s/AKfycby6O76KT_JNwPjqwGKa1AlMyHctrJjui8SO2_SOnlLnMqAC2ACT0NqLy_0HjMoNEzk_3A/exec"; // 👈 Put your deployment URL here
-    let images = [], current = 0;
+    const endpoint = "https://script.google.com/macros/s/AKfycby6O76KT_JNwPjqwGKa1AlMyHctrJjui8SO2_SOnlLnMqAC2ACT0NqLy_0HjMoNEzk_3A/exec";
 
+    let allImages = []; // master list of all known images
+    let queue = [];     // shuffled queue to cycle through
+    let currentIndex = -1;
+    let isTransitioning = false;
+
+    const imgEl = document.getElementById("slideshow");
+
+    // Fetch new images and update queue
     async function fetchImages() {
       try {
         const res = await fetch(endpoint);
-        images = await res.json();
-        if (images.length > 0) {
-          showNext();
-          setInterval(showNext, 15000); // Change every 5 seconds
-        } else {
-          document.body.innerHTML = "<h2 style='color:white;text-align:center;'>No images found</h2>";
+        const newImages = await res.json();
+        const newUrls = newImages.map(i => i.url);
+
+        // Check for new items
+        const additions = newUrls.filter(url => !allImages.includes(url));
+
+        if (additions.length > 0) {
+          allImages = [...new Set([...allImages, ...additions])];
+          queue.push(...shuffle(additions));
         }
       } catch (err) {
         console.error("Error fetching images:", err);
-        document.body.innerHTML = "<h2 style='color:white;text-align:center;'>Failed to load images</h2>";
       }
     }
 
-    function showNext() {
-      const img = document.getElementById("slideshow");
-      img.classList.remove("active");
-      setTimeout(() => {
-        img.src = images[current].url;
-        img.onload = () => img.classList.add("active");
-        current = (current + 1) % images.length;
-      }, 500); // Small delay for fade-out effect
+    function shuffle(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
     }
 
-    fetchImages();
+    function showNext() {
+      if (isTransitioning) return;
+      isTransitioning = true;
+
+      if (queue.length === 0) {
+        queue = shuffle(allImages);
+      }
+
+      const nextImage = queue.shift();
+      if (!nextImage) return;
+
+      imgEl.classList.add("hidden");
+      setTimeout(() => {
+        imgEl.src = nextImage;
+        imgEl.onload = () => {
+          imgEl.classList.remove("hidden");
+          isTransitioning = false;
+        };
+      }, 300);
+    }
+
+    function showPrev() {
+      if (currentIndex > 0) {
+        currentIndex -= 1;
+        const prev = allImages[currentIndex];
+        queue.unshift(prev);
+        showNext();
+      }
+    }
+
+    // Click = next
+    document.body.addEventListener("click", showNext);
+
+    // Swipe = next/prev
+    let touchStartX = 0;
+    document.body.addEventListener("touchstart", e => {
+      touchStartX = e.changedTouches[0].screenX;
+    });
+
+    document.body.addEventListener("touchend", e => {
+      const deltaX = e.changedTouches[0].screenX - touchStartX;
+      if (Math.abs(deltaX) > 30) {
+        if (deltaX < 0) showNext();
+        else showPrev();
+      }
+    });
+
+    // Auto fetch every 10 seconds
+    setInterval(fetchImages, 10000);
+
+    // Start the show
+    fetchImages().then(() => {
+      if (allImages.length === 0) {
+        setTimeout(() => showNext(), 1000);
+      } else {
+        queue = shuffle(allImages);
+        showNext();
+        setInterval(showNext, 5000); // Auto advance every 5 seconds
+      }
+    });
+
   </script>
 </body>
 </html>
